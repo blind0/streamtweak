@@ -1,31 +1,30 @@
-from app.services.viewer_service.core.viewer import Viewer
+from app.services.viewer_service.core.viewer import AbstractStreamingService
+from app.services.viewer_service.streaming_services.twitch.TwitchViewer import TwitchViewer
 from app.services.viewer_service.utils.get_data import get_proxies, get_oauth
 from app.services.viewer_service.api_requests.api_requests import ApiRequest
 
 import asyncio
-import random
+from random import random
 from aiohttp import ClientSession
 from uuid import uuid4, UUID
-from typing import Dict
-
+from typing import Dict, Type, Union
 
 class ViewerPool:
-    CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko'
-
-    def __init__(self, username, number):
-        self.username:str = username
-        self.number:int = number
+    def __init__(self, service_class: Type[AbstractStreamingService], username: str, number: int):
+        self.service_class:Type[AbstractStreamingService] = service_class
+        self.username = username
+        self.number = number
         self.session = ClientSession()
-        self.instances: Dict[UUID,Viewer] = {} 
-        self.spade_url:str = ''
-        self.channel_id:str = ''
-        self.broadcast_id:str = ''
+        self.instances: Dict[uuid4, AbstractStreamingService] = {}
+        self.spade_url = ''
+        self.channel_id = ''
+        self.broadcast_id = ''
         self.myip = None
 
     
     async def _initialize_viewer(self, proxy, oauth_token):
         uid = uuid4()
-        viewer = await Viewer.create(
+        viewer = await self.service_class.create(
             id=uid,
             username=self.username,
             proxy=proxy,
@@ -40,20 +39,16 @@ class ViewerPool:
         print(f'{viewer.proxy} instance initialized successfully')
 
     async def init_instances(self):
-        proxy_lines = await get_proxies(self.number)
-        oauth_lines = await get_oauth(self.number)
-        tasks = [
-            self._initialize_viewer(proxy.strip(), oauth_token)
-            for proxy, oauth_token in zip(proxy_lines, oauth_lines)
-        ]
+        if self.service_class is TwitchViewer:
+            proxy_lines = await get_proxies(self.number)
+            oauth_lines = await get_oauth(self.number)
+            tasks = [
+                self._initialize_viewer(proxy.strip(), oauth_token)
+                for proxy, oauth_token in zip(proxy_lines, oauth_lines)
+            ]
+        else:
+            raise ValueError("Invalid service type")
         await asyncio.gather(*tasks)
-
-    # async def viewer_init(self, instance: Viewer):
-    #     await instance.init()
-    #     print(f'{instance.proxy} instance initialized successfully')
-
-    async def viewer_request(self, instance: Viewer):
-        await instance.run()
 
     async def close_sessions(self):
         tasks = [instance.close_conn() for instance in self.instances.values()]
@@ -67,7 +62,7 @@ class ViewerPool:
         await self.init_instances()
         try:
             while True:
-                tasks = [self.viewer_request(instance) for instance in self.instances.values()]
+                tasks = [instance.run() for instance in self.instances.values()]
                 await asyncio.gather(*tasks)
                 print('loop was iterated')
                 await asyncio.sleep(2)

@@ -46,6 +46,7 @@ async def shutdown(ctx):
     print('shutdown')
 
 async def start_twitch(ctx,username,number):
+    print(username)
     app = Application(username=username,number=number)
     await app.run()
 
