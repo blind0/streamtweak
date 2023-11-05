@@ -50,7 +50,3 @@ class AbstractStreamingService(ABC):
     
     async def close_session(self):
         await self.session.close()
-
-# Usage:
-# class TwitchStreamingService(AbstractStreamingService):
-#     # ... Implement abstract methods ...
