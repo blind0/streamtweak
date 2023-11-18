@@ -1,11 +1,10 @@
-# File: streaming_services/twitch/TwitchViewer.py
-
 from app.services.viewer_service.core.viewer import AbstractStreamingService  # adjust import according to your project structure
 
 from fake_useragent import UserAgent
 
 from random import random
 import re
+import streamlink
 
 class TwitchViewer(AbstractStreamingService):
     CLIENT_ID = 'ewvlchtxgqq88ru9gmfp1gmyt6h2b93'
@@ -22,6 +21,7 @@ class TwitchViewer(AbstractStreamingService):
         self.sig = None
         self.token = None
         self._request_link = None
+        self.ua = UserAgent(min_percentage=1.3)
         print(self.session)
     
     @classmethod
@@ -40,7 +40,7 @@ class TwitchViewer(AbstractStreamingService):
             'Accept': '*/*',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'User-Agent': UserAgent().chrome,
+            'User-Agent': self.ua.getChrome,
             'Device-Id': self.device_id,
             "Authorization": f"OAuth {self.oauth_token}",
         }
@@ -100,9 +100,14 @@ class TwitchViewer(AbstractStreamingService):
 
     
     async def init(self):
+        await self.get_integrity_token()
         try:
+            
             await self.set_cookies()
-            await self.update_headers()
+            await self.update_headers({
+            "referer": "https://player.twitch.tv",
+            "origin": "https://player.twitch.tv",
+            })
             await self.get_stream_token()
         except Exception as e:
             print(f"Initialization failed: {e}")
