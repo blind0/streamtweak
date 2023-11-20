@@ -1,8 +1,8 @@
-# File: streaming_services/twitch/TwitchViewer.py
-
 from app.services.viewer_service.core.viewer import AbstractStreamingService  # adjust import according to your project structure
+from app.services.viewer_service.streaming_services.twitch.Twitch import Twitch
 
 from fake_useragent import UserAgent
+from typing import Optional
 
 from random import random
 import re
@@ -22,8 +22,8 @@ class TwitchViewer(AbstractStreamingService):
         self.sig = None
         self.token = None
         self._request_link = None
-        print(self.session)
-    
+        self.ua = UserAgent(os='windows')
+        self.twitchapi: Optional[Twitch] = None
     @classmethod
     async def create(cls, id, absip, username: str, proxy: str, spade_url: str, channel_id: str, broadcast_id: str, oauth: str):
         return TwitchViewer(id=id, username=username, proxy=proxy, spade_url=spade_url, channel_id=channel_id, broadcast_id=broadcast_id, oauth=oauth, absip=absip)
@@ -40,9 +40,8 @@ class TwitchViewer(AbstractStreamingService):
             'Accept': '*/*',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'User-Agent': UserAgent().chrome,
-            'Device-Id': self.device_id,
-            "Authorization": f"OAuth {self.oauth_token}",
+            'User-Agent': self.ua.random,
+
         }
         self.session.headers.update(headers)
     
@@ -100,20 +99,13 @@ class TwitchViewer(AbstractStreamingService):
 
     
     async def init(self):
-        try:
-            await self.set_cookies()
-            await self.update_headers()
-            await self.get_stream_token()
-        except Exception as e:
-            print(f"Initialization failed: {e}")
+        await self.set_cookies()
+        await self.update_headers()
+        self.twitchapi = Twitch(self.channel_id,self.session,self.device_id,self.oauth_token,self.proxy)
 
     async def run(self):
-        resp = await self.check_proxy()
-        if not resp:
-            return
-        await self.fetch_stream_data()
-        for _ in range(9):
-            feed = await self.viewer_request()
+        feed = await self.twitchapi.get_streams()
+        await self.session.head(feed)
         return feed
     
     async def check_proxy(self):
