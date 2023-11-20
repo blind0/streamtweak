@@ -7,8 +7,8 @@ class TwitchHLSStream:
         pass
     
     @staticmethod
-    async def _fetch_playlist(session:ClientSession,url:str,):
-        async with session.get(url) as response:
+    async def _fetch_playlist(session:ClientSession,url:str,proxy):
+        async with session.get(url,proxy=proxy) as response:
             return await response.text()
     
     @staticmethod
@@ -24,8 +24,8 @@ class TwitchHLSStream:
         return audio_only_url
 
     @classmethod
-    async def parse(cls, session:ClientSession, url:str):
-        playlist = await cls._fetch_playlist(session, url)
+    async def parse(cls, session:ClientSession, url:str,proxy):
+        playlist = await cls._fetch_playlist(session, url,proxy)
         audio_only_url = await cls._parse_playlist(playlist)
         if not audio_only_url:
             return False

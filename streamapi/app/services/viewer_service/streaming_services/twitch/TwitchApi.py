@@ -6,8 +6,9 @@ import aiohttp
 class TwitchAPI:
     CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
 
-    def __init__(self, session: ClientSession):
+    def __init__(self, session: ClientSession, proxy):
         self.session: ClientSession = session
+        self.proxy = proxy
         self.headers = {
             "Client-ID": self.CLIENT_ID,
         }
@@ -29,11 +30,12 @@ class TwitchAPI:
         async with self.session.post(
             "https://gql.twitch.tv/gql",
             json=query,
-            headers=self.headers
+            headers=self.headers,
+            proxy=self.proxy
         ) as response:
             return response['data']['user']['stream']['type']
 
-    async def access_token(self, is_live, channel, client_integrity: Optional[Tuple[str, str]] = None):
+    async def access_token(self, is_live, channel, client_integrity: Optional[Tuple[str, str]] = None, oauth:str = None):
         query = {
                 "operationName": "PlaybackAccessToken",
                 "extensions": {
@@ -51,24 +53,30 @@ class TwitchAPI:
                 }
             }
         headers = self.headers.copy()
+        headers['Authorization'] = f"OAuth {oauth}"
             # If there's an integrity token, it should be added to headers here
+        if client_integrity:
+            headers["Device-Id"], headers["Client-Integrity"] = client_integrity
 
         async with self.session.post(
             "https://gql.twitch.tv/gql",
             json=query,
-            headers=headers
+            headers=headers,
+            proxy=self.proxy
         ) as response:
-            response.raise_for_status()
             data = await response.json()
-
+            print(response.request_info.headers)
         # Here you would extract the 'sig', 'token', and 'restricted_bitrates' from the response
         # Since the structure of the response is not provided, this is a placeholder for the extraction logic
         if data.get('error'):
-            return 'error', data['error'],data['message']
+            return 'error', data['error'], data['message']
         
-        response = 'token'
-        sig = data['data']["streamPlaybackAccessToken"]["signature"]
-        token = data['data']["streamPlaybackAccessToken"]['value']
+        try:
+            response = 'token'
+            sig = data['data']["streamPlaybackAccessToken"]["signature"]
+            token = data['data']["streamPlaybackAccessToken"]['value']
+        except TypeError:
+            return 'error','error','error'
 
         return response, sig, token
 
